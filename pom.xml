@@ -200,9 +200,11 @@
 							<target>
 								<mkdir dir="logs" />
 								<copy file="${basedir}/src/main/resources/messages_en.properties"
-									tofile="${project.build.outputDirectory}/messages.properties" />
+									tofile="${project.build.outputDirectory}/messages.properties" 
+									failonerror="false"/>
 								<copy file="${basedir}/src/main/resources/indexpage_en.properties"
-									tofile="${project.build.outputDirectory}/indexpage.properties" />
+									tofile="${project.build.outputDirectory}/indexpage.properties" 
+									failonerror="false"/>
 								<delete
 									file="${project.build.outputDirectory}/org/t246osslab/easybuggy/core/utils/DeleteClassWhileMavenBuild.class" />
 							</target>
