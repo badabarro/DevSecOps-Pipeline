@@ -1,138 +1,87 @@
-[![Build Status](https://travis-ci.org/k-tamura/easybuggy.svg?branch=master)](https://travis-ci.org/k-tamura/easybuggy)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![GitHub release](https://img.shields.io/github/release/k-tamura/easybuggy.svg)](https://github.com/k-tamura/easybuggy/releases/latest)
+# Pipeline CI/CD Sécurisé pour EasyBuggy
 
-EasyBuggy Vulnerable Web App Modified by A Security Guru :baby_symbol:
-=
+Ce projet met en œuvre une pipeline **DevSecOps** complète avec Jenkins, intégrant l’analyse statique, la détection de vulnérabilités dans les conteneurs, l’analyse dynamique, et la sécurité des infrastructures as code (IaC). Il s'appuie sur l'application Java vulnérable [EasyBuggy](https://github.com/kazuki43zoo/buggyapp) comme démonstrateur.
 
-EasyBuggy is a broken web application in order to understand behavior of bugs and vulnerabilities, for example, [memory leak, deadlock, JVM crash, SQL injection and so on](https://github.com/k-tamura/easybuggy#clock4-easybuggy-can-reproduce).
+---
 
-![logo](https://raw.githubusercontent.com/wiki/k-tamura/easybuggy/images/mov_eb.gif)
+## Technologies utilisées
 
-:clock4: Quick Start
--
+- **CI/CD** : Jenkins (Pipeline déclaratif)
+- **Build** : Maven 3.8.7
+- **Conteneurisation** : Docker (multi-stage)
+- **Analyse statique (SAST)** : SonarQube
+- **Analyse de dépendances / conteneurs (SCA)** : Snyk
+- **Analyse dynamique (DAST)** : OWASP ZAP
+- **Sécurité IaC** : Checkov (pour les fichiers Terraform)
 
-    $ mvn clean install
+---
 
-( or ``` java -jar easybuggy.jar ``` or deploy ROOT.war on your servlet container with [the JVM options](https://github.com/k-tamura/easybuggy/blob/master/pom.xml#L204). )
+## Description des étapes Jenkins
 
-Access to
+### 1. Compilation & Analyse SonarQube
+Compile le projet Java et lance une analyse de code via SonarQube.  
+> Requiert un serveur SonarQube accessible à `http://localhost:9000` et un token d’authentification (`SONAR_TOKEN`).
 
-    http://localhost:8080
+---
 
-:clock4: Quick Start(Docker)
--
+### 2. Construction de l’image Docker
+Utilise un Dockerfile multi-stage pour builder et packager l’application Java.  
+> Image générée : `asecurityguru/testeb`
 
-    $ docker build . -t easybuggy:local # Build container image
-    $ docker run -p 8080:8080 easybuggy:local # Start easybuggy
+---
 
-Access to
+### 3. Scan de conteneur avec Snyk
+Lance une analyse de vulnérabilités sur l’image Docker avec [Snyk CLI](https://snyk.io/).
 
-    http://localhost:8080
+---
 
-### To stop:
+### 4. Analyse de dépendances Maven avec Snyk
+Vérifie les bibliothèques du projet Java (via `pom.xml`) pour détecter les vulnérabilités connues.
 
-  Use <kbd>CTRL</kbd>+<kbd>C</kbd> ( or access to: http://localhost:8080/exit )
+---
 
-:clock4: For more detail
--
-   
-See [the wiki page](https://github.com/k-tamura/easybuggy/wiki).
+### 5. Analyse dynamique avec OWASP ZAP
+Effectue un scan DAST sur l’URL cible `https://www.example.com`.  
+> Rapport HTML généré : `C:\SAST\ZAP_2.16.0\Output.html`
 
-:clock4: Demo
--
+---
 
-This demo shows: Start up -> Infinite Loop -> LDAP Injection -> UnsatisfiedLinkError -> BufferOverflowException -> Deadlock -> Memory Leak -> JVM Crash (Shut down)
+### 6. Scan IaC avec Checkov
+Analyse le fichier Terraform `main.tf` pour identifier des erreurs de configuration ou failles de sécurité.
 
-![demo](https://github.com/k-tamura/easybuggy/blob/master/demo_eb.gif)
+---
 
-:clock4: EasyBuggy can reproduce:
--
+## Dockerfile – Build multi-stage
 
-* Troubles
+- Étape 1 : Build Maven
+- Étape 2 : Image légère avec OpenJDK 8 + exécution de `easybuggy.jar`
+- Nombreux paramètres JVM configurés pour le monitoring, la mémoire, le debug, les logs GC...
 
-  * Memory Leak (Java heap space)
-  * Memory Leak (PermGen space)
-  * Memory Leak (C heap space)
-  * Deadlock (Java)
-  * Deadlock (SQL)
-  * Endless Waiting Process
-  * Infinite Loop
-  * Redirect Loop
-  * Forward Loop
-  * JVM Crash
-  * Network Socket Leak
-  * Database Connection Leak
-  * File Descriptor Leak 
-  * Thread Leak 
-  * Mojibake
-  * Integer Overflow
-  * Round Off Error
-  * Truncation Error
-  * Loss of Trailing Digits
+---
 
-* Vulnerabilities
+## Credentials nécessaires dans Jenkins
 
-  * XSS (Cross-Site Scripting)
-  * SQL Injection
-  * LDAP Injection
-  * Code Injection
-  * OS Command Injection (OGNL Expression Injection)
-  * Mail Header Injection
-  * Null Byte Injection
-  * Extension Unrestricted File Upload
-  * Size Unrestricted File Upload
-  * Open Redirect
-  * Brute-force Attack
-  * Session Fixation Attacks
-  * Verbose Login Error Messages
-  * Dangerous File Inclusion
-  * Directory Traversal
-  * Unintended File Disclosure
-  * CSRF (Cross-Site Request Forgery)
-  * XEE (XML Entity Expansion)
-  * XXE (XML eXternal Entity)
-  * Clickjacking
+| ID du secret     | Utilisation                          |
+|------------------|---------------------------------------|
+| `SONAR_TOKEN`    | Authentification SonarQube            |
+| `SNYK_TOKEN`     | Authentification Snyk                 |
+| `dockerlogin`    | Connexion au registre DockerHub       |
 
-* Performance Degradation
+---
 
-  * Slow Regular Expression Parsing
-  * Delay of creating string due to +(plus) operator
-  * Delay due to unnecessary object creation
+## Pré-requis
 
-* Errors
+- Jenkins installé (avec support Pipeline, Docker)
+- Docker installé
+- SonarQube en local ou distant
+- Snyk CLI disponible (`snyk-win.exe` ou `snyk` via PATH)
+- OWASP ZAP installé (`zap.sh`)
+- Checkov installé (`checkov` via PATH)
 
-  * AssertionError
-  * ExceptionInInitializerError
-  * FactoryConfigurationError
-  * GenericSignatureFormatError
-  * NoClassDefFoundError
-  * OutOfMemoryError (Java heap space) 
-  * OutOfMemoryError (Requested array size exceeds VM limit)
-  * OutOfMemoryError (unable to create new native thread)
-  * OutOfMemoryError (GC overhead limit exceeded)
-  * OutOfMemoryError (PermGen space)
-  * OutOfMemoryError (Direct buffer memory)
-  * StackOverflowError
-  * TransformerFactoryConfigurationError
-  * UnsatisfiedLinkError
+---
 
-:clock4: EasyBuggy clones:
--
-* [EasyBuggy Boot](https://github.com/k-tamura/easybuggy4sb)
+Auteur
 
-  EasyBuggy clone build on Spring Boot
+Badaoudou Barro
 
-  ![logo](https://raw.githubusercontent.com/wiki/k-tamura/easybuggy/images/mov_ebsb.gif)
-
-* [EasyBuggy Bootlin](https://github.com/k-tamura/easybuggy4kt)
-
-  EasyBuggy clone build on Spring Boot and written in Kotlin
-
-  ![logo](https://raw.githubusercontent.com/wiki/k-tamura/easybuggy/images/mov_ebkt.gif)
-
-* [EasyBuggy Django](https://github.com/k-tamura/easybuggy4django)
-
-  EasyBuggy clone build on Django 2 and written in Python
-
-  　![logo](https://github.com/k-tamura/easybuggy4django/blob/master/static/easybuggy.png)
+---
